@@ -1,0 +1,39 @@
+# Global Configuration for AWS Big Data E-commerce Pipeline
+
+# Environment configuration: dev, staging, prod
+environment: dev
+
+aws:
+  region: us-east-1
+  s3_bucket: ecommerce-lakehouse-bucket
+  s3_raw_prefix: raw/
+  s3_curated_prefix: curated/
+  s3_temp_prefix: temp/
+  glue_role_arn: arn:aws:iam::123456789012:role/GlueSparkETLRole
+  glue_job_name: ecommerce-pyspark-etl-job
+  redshift_schema: public
+  redshift_iam_role: arn:aws:iam::123456789012:role/RedshiftS3ReadRole
+
+local:
+  # Directories for running and testing locally (simulated raw landing pad)
+  data_dir: C:/Users/Avadhut/bigdata_ecommerce_pipeline/data
+  raw_dir: C:/Users/Avadhut/bigdata_ecommerce_pipeline/data/raw
+  curated_dir: C:/Users/Avadhut/bigdata_ecommerce_pipeline/data/curated
+
+data_generation:
+  num_customers: 1500
+  num_products: 150
+  num_orders: 5000
+  start_date: 2026-01-01
+  end_date: 2026-06-01
+  address_change_probability: 0.15   # Probability that a customer changes address (for SCD Type 2 testing)
+  price_change_probability: 0.20     # Probability that product prices change (for SCD Type 1 testing)
+
+database:
+  # Settings for Redshift DWH
+  # In production, credentials should be fetched from AWS Secrets Manager or Env Vars
+  host: redshift-cluster-1.xxxxxxxxx.us-east-1.redshift.amazonaws.com
+  port: 5439
+  database_name: dev_ecommerce
+  user: awsuser
+  password_env_var: REDSHIFT_PASSWORD

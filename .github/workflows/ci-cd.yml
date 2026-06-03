@@ -1,0 +1,76 @@
+name: CI-CD Big Data Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Set up Java (Required for PySpark)
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '11' # Spark 3.x is highly compatible with Java 8/11
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pandas numpy pyyaml boto3 pyspark
+
+    - name: Lint with Flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings.
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run Unit Tests
+      run: |
+        # Run tests and print stdout
+        pytest -v
+
+  deploy-to-aws:
+    needs: validate-and-test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # In a production environment, you authenticate with AWS using OpenID Connect (OIDC) or IAM User credentials.
+    # Replace these secret variables in GitHub Repo Settings -> Secrets and Variables -> Actions
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Deploy Scripts to S3 (AWS Glue & Airflow Target Bucket)
+      run: |
+        # Sync the Spark ETL job script to the Glue scripts repository in S3
+        aws s3 cp src/jobs/spark_etl.py s3://ecommerce-lakehouse-bucket/scripts/spark_etl.py
+        
+        # Sync Airflow DAGs to the MWAA DAGs folder
+        aws s3 cp dags/ecommerce_etl_dag.py s3://ecommerce-lakehouse-bucket/dags/ecommerce_etl_dag.py
+        
+        # Sync config and DDL folders
+        aws s3 cp config/config.yaml s3://ecommerce-lakehouse-bucket/config/config.yaml
+        aws s3 cp config/redshift_ddl.sql s3://ecommerce-lakehouse-bucket/config/redshift_ddl.sql
+        
+        echo "[DEPLOY] All pipeline scripts successfully uploaded to S3!"
